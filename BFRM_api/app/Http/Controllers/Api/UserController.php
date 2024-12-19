@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
 
 class UserController extends Controller
 {
@@ -29,15 +29,19 @@ class UserController extends Controller
                 ], 401);
             }
 
+            $otp = rand(100000, 999999);
             $user = User::create([
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
+                'otp' => $otp,
             ]);
+            
+            Mail::to($user->email)->send(new \App\Mail\OtpMail($otp));
 
             return response()->json([
                 'status' => true,
-                'message' => 'User Created Successfully',
+                'message' => 'User Registered Successfully. Check your email for OTP',
                 'token' => $user->createToken("API TOKEN")->plainTextToken,
                 'data' => [
                     'email' => $user->email,
@@ -53,6 +57,27 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->where('otp', $request->otp)->first();
+
+        if (!$user) {
+            return response()->json(['status' => false, 'message' => 'Invalid OTP'], 401);
+        }
+
+        $user->is_verified = true;
+        $user->otp = null; // Clear OTP after verification
+        $user->save();
+
+        return response()->json(['status' => true, 'message' => 'Email verified successfully']);
+    }
+
 
     public function Login(Request $request)
     {

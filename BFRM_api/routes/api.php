@@ -10,4 +10,5 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::post('register', [UserController::class, 'Register']);
+Route::post('verify-otp', [UserController::class, 'verifyOtp']);
 Route::post('login', [UserController::class, 'Login']);
