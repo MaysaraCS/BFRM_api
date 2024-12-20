@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
@@ -103,6 +104,13 @@ class UserController extends Controller
             }
 
             $user = User::where('email', $request->email)->first();
+
+            if(!$user->is_verified){
+                    return response()->json([
+                    'status' => false,
+                    'message' => 'Please verify your email before logging in.',
+                ], 403);
+            }
 
             return response()->json([
                 'status' => true,
