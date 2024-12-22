@@ -15,11 +15,24 @@ class UserController extends Controller
     public function Register(Request $request)
     {
         try {
-            // Validated
+            // Validation
             $validateUser = Validator::make($request->all(), [
                 'email' => 'required|email|unique:users,email',
-                'password' => 'required|confirmed',
+                'password' => [
+                    'required',
+                    'string',
+                    'min:8',                // Minimum of 8 characters
+                    'regex:/[a-z]/',        // At least one lowercase letter
+                    'regex:/[A-Z]/',        // At least one uppercase letter
+                    'regex:/[0-9]/',        // At least one digit
+                    'regex:/[@$!%*?&]/',    // At least one special character
+                    'confirmed',            // Matches password_confirmation
+                ],
                 'role' => 'required|in:merchant,customer',
+            ], [
+                'password.min' => 'Password must be at least 8 characters.',
+                'password.regex' => 'Password must include uppercase, lowercase, numbers, and special characters.',
+                'password.confirmed' => 'Passwords do not match.',
             ]);
 
             if ($validateUser->fails()) {
@@ -30,31 +43,34 @@ class UserController extends Controller
                 ], 401);
             }
 
+            // Generate OTP
             $otp = rand(100000, 999999);
+
+            // Create User
             $user = User::create([
-                'email' => $request->email,
+                'email' => strtolower($request->email),
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'otp' => $otp,
             ]);
             
+            // Send OTP Email
             Mail::to($user->email)->send(new \App\Mail\OtpMail($otp));
 
             return response()->json([
                 'status' => true,
-                'message' => 'User Registered Successfully. Check your email for OTP',
-                'token' => $user->createToken("API TOKEN")->plainTextToken,
+                'message' => 'User Registered Successfully. Check your email for OTP.',
+                'token' => $user->createToken("API TOKEN", [$user->role])->plainTextToken,
                 'data' => [
                     'email' => $user->email,
-                    'password' => $request->password, 
                     'role' => $user->role,
-            ],
-        ], 200);
+                ],
+            ], 200);
 
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => false,
-                'message' => $th->getMessage()
+                'message' => 'An unexpected error occurred. Please try again later.'
             ], 500);
         }
     }
@@ -66,7 +82,7 @@ class UserController extends Controller
             'otp' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->where('otp', $request->otp)->first();
+        $user = User::where('email', strtolower($request->email))->where('otp', $request->otp)->first();
 
         if (!$user) {
             return response()->json(['status' => false, 'message' => 'Invalid OTP'], 401);
@@ -78,7 +94,6 @@ class UserController extends Controller
 
         return response()->json(['status' => true, 'message' => 'Email verified successfully']);
     }
-
 
     public function Login(Request $request)
     {
@@ -96,17 +111,17 @@ class UserController extends Controller
                 ], 401);
             }
 
-            if (!Auth::attempt($request->only(['email', 'password']))) {
+            if (!Auth::attempt(['email' => strtolower($request->email), 'password' => $request->password])) {
                 return response()->json([
                     'status' => false,
                     'message' => 'Email & Password do not match our records.',
                 ], 401);
             }
 
-            $user = User::where('email', $request->email)->first();
+            $user = User::where('email', strtolower($request->email))->first();
 
-            if(!$user->is_verified){
-                    return response()->json([
+            if (!$user->is_verified) {
+                return response()->json([
                     'status' => false,
                     'message' => 'Please verify your email before logging in.',
                 ], 403);
@@ -115,13 +130,13 @@ class UserController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'User Logged In Successfully',
-                'token' => $user->createToken("API TOKEN")->plainTextToken
+                'token' => $user->createToken("API TOKEN", [$user->role])->plainTextToken
             ], 200);
 
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => false,
-                'message' => $th->getMessage()
+                'message' => 'An unexpected error occurred. Please try again later.'
             ], 500);
         }
     }
