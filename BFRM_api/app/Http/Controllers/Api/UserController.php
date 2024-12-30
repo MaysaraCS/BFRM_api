@@ -140,4 +140,22 @@ class UserController extends Controller
             ], 500);
         }
     }
+    public function Logout(Request $request)
+    {
+        try {
+            $request->user()->tokens()->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Logged out successfully',
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An unexpected error occurred. Please try again later.',
+            ], 500);
+        }
+    }
 }
+
